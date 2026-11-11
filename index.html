@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotify Hit Predictor — Giải thích trọn vẹn</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #F8F9FB;
+  --surface: #FFFFFF;
+  --text: #1A1D23;
+  --text-muted: #5A6270;
+  --border: #E3E6EB;
+  --accent: #2563EB;
+  --accent-soft: rgba(37,99,235,0.08);
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger: #DC2626;
+  --sidebar-w: 260px;
+  --chart-1: #2563EB;
+  --chart-2: #F97316;
+  --chart-3: #16A34A;
+  --chart-4: #DC2626;
+  --chart-5: #8B5CF6;
+  --chart-6: #0891B2;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  font-size: 16px;
+}
+/* Progress */
+#progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px; background: var(--accent);
+  width: 0%; z-index: 1000; transition: width 0.1s linear;
+}
+#progress-text {
+  position: fixed; top: 6px; right: 16px; font-size: 11px; color: var(--text-muted);
+  background: var(--surface); padding: 2px 8px; border-radius: 10px; z-index: 1000;
+  box-shadow: var(--shadow); display: none;
+}
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: var(--sidebar-w); position: fixed; top: 0; left: 0; bottom: 0;
+  background: var(--surface); border-right: 1px solid var(--border);
+  padding: 24px 16px; overflow-y: auto; z-index: 100;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sidebar .logo {
+  font-weight: 700; font-size: 15px; color: var(--accent); margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sidebar nav a {
+  display: block; padding: 8px 12px; border-radius: 8px; color: var(--text-muted);
+  text-decoration: none; font-size: 14px; transition: all 0.15s;
+}
+.sidebar nav a:hover { background: var(--accent-soft); color: var(--accent); }
+.sidebar nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sidebar .side-actions { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+.sidebar .side-actions button {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); cursor: pointer; font-size: 13px; margin-bottom: 6px;
+}
+.sidebar .side-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.main {
+  margin-left: var(--sidebar-w); flex: 1; padding: 48px 32px 80px;
+  max-width: 920px;
+}
+.hamburger {
+  display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
+  width: 40px; height: 40px; border: none; background: var(--surface);
+  border-radius: 8px; box-shadow: var(--shadow); cursor: pointer; font-size: 20px;
+}
+.drawer-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 90;
+}
+/* Typography */
+h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 12px; }
+h2 { font-size: 1.6rem; font-weight: 700; margin: 0 0 16px; padding-top: 8px; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: 10px; }
+p { margin-bottom: 12px; color: var(--text); }
+.muted { color: var(--text-muted); font-size: 0.95rem; }
+section { margin-bottom: 72px; scroll-margin-top: 24px; }
+/* Cards */
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 22px; margin-bottom: 20px; box-shadow: var(--shadow);
+}
+.card-header {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  margin-bottom: 14px;
+}
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;
+  margin: 20px 0;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; text-align: center;
+}
+.stat-card .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+.stat-card .label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.hero-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0;
+}
+.hero-stat {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: white; border-radius: var(--radius); padding: 20px; text-align: center;
+}
+.hero-stat .num { font-size: 2rem; font-weight: 700; }
+.hero-stat .label { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+/* Pipeline */
+.pipeline {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 20px 0;
+}
+.pipeline-step {
+  background: var(--accent-soft); color: var(--accent); padding: 8px 14px;
+  border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; transition: all 0.15s;
+}
+.pipeline-step:hover { border-color: var(--accent); background: white; }
+.pipeline-arrow { color: var(--text-muted); font-size: 14px; }
+/* Callouts */
+.callout {
+  border-left: 4px solid var(--accent); background: var(--accent-soft);
+  padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 0.95rem;
+}
+.callout.why { border-color: var(--accent); }
+.callout.caveat { border-color: var(--warning); background: rgba(217,119,6,0.08); }
+.callout.insight { border-color: var(--success); background: rgba(22,163,74,0.08); }
+.callout.simulated { border-color: var(--danger); background: rgba(220,38,38,0.06); }
+.callout strong { display: block; margin-bottom: 4px; }
+/* Why button */
+.why-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--accent-soft); color: var(--accent); border: none;
+  padding: 4px 10px; border-radius: 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.why-btn:hover { background: var(--accent); color: white; }
+.why-panel {
+  display: none; margin-top: 12px; padding: 14px 16px;
+  background: #F0F4FF; border-radius: 8px; border: 1px solid #C7D2FE;
+  font-size: 0.92rem; line-height: 1.6;
+}
+.why-panel.open { display: block; }
+/* Charts */
+.chart-wrap {
+  position: relative; height: 280px; margin: 12px 0 8px;
+}
+.chart-wrap.tall { height: 340px; }
+.chart-wrap.short { height: 220px; }
+.chart-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+/* Code viewer */
+.code-viewer {
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  margin: 16px 0; background: #1e1e2e;
+}
+.code-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; background: #2a2a3c; color: #cdd6f4; font-size: 13px;
+}
+.code-header .filename { font-family: ui-monospace, monospace; }
+.code-actions button {
+  background: transparent; border: 1px solid #45475a; color: #cdd6f4;
+  padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 6px;
+}
+.code-actions button:hover { background: #45475a; }
+.code-body {
+  margin: 0; padding: 12px 0; overflow-x: auto; max-height: 420px; overflow-y: auto;
+  font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace; font-size: 13px;
+  line-height: 1.55; color: #cdd6f4;
+}
+.code-body .line {
+  display: block; padding: 0 16px 0 48px; position: relative; white-space: pre;
+}
+.code-body .line::before {
+  content: attr(data-line); position: absolute; left: 0; width: 40px;
+  text-align: right; color: #6c7086; padding-right: 8px; user-select: none;
+}
+.code-body .line.highlight { background: rgba(37,99,235,0.25); }
+/* Tables */
+table.data-table {
+  width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0;
+}
+table.data-table th, table.data-table td {
+  padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border);
+}
+table.data-table th {
+  background: #F1F5F9; font-weight: 600; position: sticky; top: 0; cursor: pointer;
+}
+table.data-table tr:hover td { background: #F8FAFC; }
+table.data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Toggle / Slider */
+.widget {
+  background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; margin: 14px 0;
+}
+.widget label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 8px; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type=range] { flex: 1; }
+.slider-val { font-weight: 700; color: var(--accent); min-width: 48px; }
+.toggle-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.toggle-btn {
+  padding: 6px 14px; border-radius: 16px; border: 1px solid var(--border);
+  background: white; cursor: pointer; font-size: 13px;
+}
+.toggle-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+/* Checkpoint */
+.checkpoint {
+  background: #FEF9C3; border: 1px solid #FDE047; border-radius: var(--radius);
+  padding: 16px 18px; margin: 24px 0;
+}
+.checkpoint h4 { margin-bottom: 10px; font-size: 15px; }
+.checkpoint label {
+  display: block; padding: 6px 10px; margin: 4px 0; border-radius: 6px;
+  cursor: pointer; font-size: 14px;
+}
+.checkpoint label:hover { background: rgba(0,0,0,0.04); }
+.checkpoint .feedback {
+  margin-top: 10px; padding: 10px; border-radius: 6px; font-size: 14px; display: none;
+}
+.checkpoint .feedback.correct { background: #DCFCE7; color: #166534; display: block; }
+.checkpoint .feedback.wrong { background: #FEE2E2; color: #991B1B; display: block; }
+/* Accordion FAQ */
+.faq-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.faq-q {
+  width: 100%; text-align: left; padding: 14px 16px; background: var(--surface);
+  border: none; cursor: pointer; font-size: 15px; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.faq-q:hover { background: #F8FAFC; }
+.faq-a {
+  display: none; padding: 0 16px 16px; font-size: 14.5px; color: var(--text);
+  border-top: 1px solid var(--border);
+}
+.faq-item.open .faq-a { display: block; padding-top: 12px; }
+.faq-item.open .faq-q { color: var(--accent); }
+/* Glossary modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  z-index: 500; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: white; border-radius: 12px; max-width: 560px; width: 100%;
+  max-height: 80vh; overflow-y: auto; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+.modal h2 { margin-bottom: 12px; }
+.modal .close-btn {
+  float: right; border: none; background: none; font-size: 22px; cursor: pointer; color: var(--text-muted);
+}
+.glossary-search {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 12px; font-size: 14px;
+}
+.glossary-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.glossary-item .term { font-weight: 700; color: var(--accent); }
+.glossary-item .def { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+/* Term underline */
+.term {
+  border-bottom: 1px dashed var(--accent); cursor: help; color: var(--accent);
+}
+/* Insight cards */
+.insight-card {
+  display: flex; gap: 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+}
+.insight-card .num-badge {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent); color: white; display: flex; align-items: center;
+  justify-content: center; font-weight: 700; font-size: 16px;
+}
+/* Limitation table filters */
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.filter-chip {
+  padding: 5px 12px; border-radius: 14px; border: 1px solid var(--border);
+  background: white; cursor: pointer; font-size: 13px;
+}
+.filter-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+/* Back to top */
+#back-top {
+  position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px;
+  border-radius: 50%; background: var(--accent); color: white; border: none;
+  font-size: 20px; cursor: pointer; box-shadow: var(--shadow); z-index: 50;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+#back-top.show { opacity: 1; pointer-events: auto; }
+/* Bullet lists */
+ul.clean { padding-left: 20px; margin: 8px 0 12px; }
+ul.clean li { margin-bottom: 4px; }
+.bullets { margin: 8px 0 12px; padding-left: 0; list-style: none; }
+.bullets li::before { content: "• "; color: var(--accent); font-weight: 700; }
+.bullets li { margin-bottom: 6px; padding-left: 4px; }
+/* Metric bars in table */
+.metric-bar {
+  height: 6px; background: #E2E8F0; border-radius: 3px; margin-top: 4px; overflow: hidden;
+}
+.metric-bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+/* Responsive */
+@media (max-width: 1023px) {
+  .sidebar { transform: translateX(-100%); transition: transform 0.25s; }
+  .sidebar.open { transform: translateX(0); }
+  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .main { margin-left: 0; padding: 56px 16px 60px; }
+  .hero-stats { grid-template-columns: 1fr; }
+  .drawer-overlay.open { display: block; }
+}
+@media (max-width: 600px) {
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.3rem; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="progress-bar"></div>
+<span id="progress-text">0%</span>
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="drawer-overlay" id="drawer-overlay"></div>
+
+<div class="layout">
+<aside class="sidebar" id="sidebar">
+  <div class="logo">🎧 Spotify Hit Explainer</div>
+  <nav id="side-nav">
+    <a href="#overview" data-section="overview">0. Tổng quan</a>
+    <a href="#cleaning" data-section="cleaning">1. Làm sạch dữ liệu</a>
+    <a href="#eda" data-section="eda">2. Phân tích mô tả (EDA)</a>
+    <a href="#model" data-section="model">3. Mô hình dự báo</a>
+    <a href="#conclusion" data-section="conclusion">4. Kết luận & hạn chế</a>
+    <a href="#faq" data-section="faq">5. Câu hỏi phản biện</a>
+  </nav>
+  <div class="side-actions">
+    <button id="btn-glossary">📖 Glossary</button>
+    <button id="btn-dark" style="display:none">🌓 Dark</button>
+  </div>
+</aside>
+
+<main class="main">
+
+<!-- ========== 0. OVERVIEW ========== -->
+<section id="overview">
+  <h1>Spotify Hit Predictor — Giải thích trọn vẹn</h1>
+  <p class="muted">Tài liệu học tập tương tác · Khoa học dữ liệu trong Kinh tế và Kinh doanh · Nhóm 4</p>
+  <p>Trang này dẫn bạn đi từ dữ liệu thô Spotify đến kết luận: <strong>điều gì làm một bài hát nổi tiếng?</strong> Bạn sẽ thấy từng quyết định phân tích, từng biểu đồ, và lý do đằng sau mỗi lựa chọn.</p>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="num">85.361</div>
+      <div class="label">bài hát sau làm sạch</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">R² 0.19</div>
+      <div class="label">mô hình hồi quy tốt nhất</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">AUC 0.804</div>
+      <div class="label">mô hình phân loại tốt nhất</div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">114.000</div><div class="label">dòng gốc</div></div>
+    <div class="stat-card"><div class="num">114</div><div class="label">thể loại</div></div>
+    <div class="stat-card"><div class="num">11</div><div class="label">đặc trưng âm thanh</div></div>
+    <div class="stat-card"><div class="num">10.2%</div><div class="label">tỷ lệ hit (top 10%)</div></div>
+  </div>
+
+  <h3>Pipeline phân tích</h3>
+  <div class="pipeline" id="pipeline">
+    <span class="pipeline-step" data-goto="cleaning">Dữ liệu thô</span>
+    <span class="pipeline-arrow">→</span>
+    <span class="pipeline-step" data-goto="cleaning">Làm sạch</span>
+    <span class="pipeline-arrow">→</span>
+    <span class="pipeline-step" data-goto="eda">EDA</span>
+    <span class="pipeline-arrow">→</span>
+    <span class="pipeline-step" data-goto="model">Hồi quy / Phân loại</span>
+    <span class="pipeline-arrow">→</span>
+    <span class="pipeline-step" data-goto="conclusion">Kết luận</span>
+  </div>
+
+  <div class="card">
+    <h3>Bạn sẽ học được gì</h3>
+    <ul class="clean">
+      <li>Vì sao bỏ ~25% dữ liệu và bỏ theo thứ tự nào</li>
+      <li>Cách đọc histogram, boxplot, heatmap, feature importance</li>
+      <li>R², AUC, precision, recall nghĩa là gì trong bài toán này</li>
+      <li>Thể loại quan trọng hơn nhiều so với từng đặc điểm âm thanh riêng lẻ</li>
+    </ul>
+  </div>
+
+  <div class="callout insight">
+    <strong>Định nghĩa “hit”</strong>
+    Bài thuộc <strong>top 10% popularity cao nhất</strong> sau làm sạch → ngưỡng ≈ 61 điểm. Tỷ lệ hit chung ≈ 10.2%.
+  </div>
+</section>
+
+<!-- ========== 1. CLEANING ========== -->
+<section id="cleaning">
+  <h2>1. Làm sạch dữ liệu</h2>
+  <p><strong>Mục tiêu:</strong> Hiểu tại sao phải bỏ khoảng 25% dữ liệu và bỏ đúng cách.</p>
+
+  <div class="callout">
+    <strong>Bắt đầu từ 114.000 dòng</strong>
+    Sau 4 bước còn <strong>85.361</strong> dòng. Mỗi bước có lý do rõ ràng — không phải “làm sạch cho sạch”.
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Waterfall: số dòng qua từng bước</h3>
+      <button class="why-btn" data-why="why-waterfall">❓ Vì sao?</button>
+    </div>
+    <div class="why-panel" id="why-waterfall">
+      Waterfall cho thấy <em>dòng chảy</em> dữ liệu: mỗi thanh là số dòng còn lại sau một quyết định. Dễ thấy bước nào “đắt” nhất (ở đây là bỏ trùng track_id: −24.259).
+    </div>
+    <div class="chart-wrap short"><canvas id="chart-waterfall"></canvas></div>
+    <p class="chart-note">Hover từng thanh để xem số dòng bị bỏ và lý do.</p>
+  </div>
+
+  <div class="card">
+    <h3>Bảng cleaning_log</h3>
+    <table class="data-table" id="table-cleaning">
+      <thead><tr><th>Bước</th><th>Lý do</th><th class="num">Trước</th><th class="num">Sau</th><th class="num">Bị bỏ</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Code viewer -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Code: data_cleaning.py</h3>
+      <button class="why-btn" data-why="why-code-clean">❓ Vì sao?</button>
+    </div>
+    <div class="why-panel" id="why-code-clean">
+      Code được viết thành hàm <code>clean()</code> để tái sử dụng. Thứ tự bước quan trọng: dropna → drop_duplicates → lọc giá trị vô lý → IQR. Đổi thứ tự có thể thay đổi số dòng cuối cùng.
+    </div>
+    <div class="code-viewer" data-file="data_cleaning.py">
+      <div class="code-header">
+        <span class="filename">data_cleaning.py</span>
+        <div class="code-actions">
+          <button data-action="copy">Copy</button>
+        </div>
+      </div>
+      <pre class="code-body" id="code-cleaning"><code></code></pre>
+    </div>
+    <p class="muted" style="margin-top:8px">Hover vào mô tả bên dưới → highlight đúng dòng code.</p>
+    <ul class="bullets" id="code-hints">
+      <li><a href="#" data-hl="22">drop_duplicates(subset="track_id")</a> — bỏ trùng theo mã bài</li>
+      <li><a href="#" data-hl="23">lọc duration_ms &gt; 0 và tempo &gt; 0</a> — loại giá trị vô lý</li>
+      <li><a href="#" data-hl="30">IQR 1.5 trên duration</a> — bỏ ngoại lệ thời lượng</li>
+      <li><a href="#" data-hl="36">quantile(0.9) → is_hit</a> — định nghĩa hit = top 10%</li>
+    </ul>
+  </div>
+
+  <!-- IQR slider -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Widget: thử đổi hệ số IQR</h3>
+      <button class="why-btn" data-why="why-iqr">❓ Vì sao IQR?</button>
+    </div>
+    <div class="why-panel" id="why-iqr">
+      IQR (Interquartile Range) = Q3 − Q1. Quy tắc 1.5×IQR là chuẩn Tukey: ít bị ảnh hưởng bởi giá trị cực đoan hơn mean ± k·std. Tăng hệ số → giữ nhiều bài dài hơn, nhưng có thể giữ ngoại lệ thật.
+    </div>
+    <div class="widget">
+      <label>Hệ số IQR (mặc định 1.5)</label>
+      <div class="slider-row">
+        <input type="range" id="iqr-slider" min="0.5" max="3.0" step="0.1" value="1.5">
+        <span class="slider-val" id="iqr-val">1.5</span>
+      </div>
+      <p style="margin-top:10px;font-size:14px">
+        Dải giữ lại: <strong id="iqr-range">[0.61 – 6.69] phút</strong><br>
+        Ước tính số dòng bị bỏ thêm (so với không lọc): <strong id="iqr-drop">~4.222</strong>
+      </p>
+      <p class="muted" style="font-size:12px">* Tính xấp xỉ từ Q1≈2.85, Q3≈4.25 phút (dữ liệu đã làm sạch một phần).</p>
+    </div>
+  </div>
+
+  <div class="callout why">
+    <strong>Vì sao bỏ trùng theo track_id?</strong>
+    Cùng một bài có thể xuất hiện nhiều dòng với thể loại khác nhau. Nếu giữ hết, mô hình học “nhiều lần” cùng bài → data leakage / trọng số sai. Chỉ giữ 1 dòng/bài.
+  </div>
+  <div class="callout why">
+    <strong>Vì sao giữ popularity = 0?</strong>
+    Khoảng 14% dữ liệu gốc. Có thể là bài mới hoặc bài ít người nghe. Bỏ chúng = selection bias (chỉ còn bài đã được nghe). Nhóm quyết định giữ.
+  </div>
+
+  <div class="checkpoint" data-qid="c1">
+    <h4>Checkpoint — Bước nào bỏ nhiều dòng nhất?</h4>
+    <label><input type="radio" name="c1" value="a"> dropna (thiếu dữ liệu)</label>
+    <label><input type="radio" name="c1" value="b"> trùng track_id</label>
+    <label><input type="radio" name="c1" value="c"> ngoại lệ IQR thời lượng</label>
+    <div class="feedback" data-answer="b">Đúng. Bỏ trùng track_id loại 24.259 dòng (~21%). Các bước khác nhỏ hơn nhiều.</div>
+  </div>
+</section>
+
+<!-- ========== 2. EDA ========== -->
+<section id="eda">
+  <h2>2. Phân tích mô tả & trực quan hóa (EDA)</h2>
+  <p><strong>Mục tiêu:</strong> Đọc được các biểu đồ chính và hiểu mỗi biểu đồ trả lời câu hỏi gì.</p>
+
+  <!-- Card 1: Histogram popularity -->
+  <div class="card" id="eda-hist">
+    <div class="card-header">
+      <h3>1. Phân bố popularity</h3>
+      <button class="why-btn" data-why="why-hist">❓ Vì sao histogram?</button>
+    </div>
+    <div class="why-panel" id="why-hist">
+      Histogram cho thấy hình dạng phân bố: lệch, đỉnh, đuôi. Với popularity, ta thấy cột 0 rất cao và đuôi mỏng về phía 100 → bài hit là thiểu số.
+    </div>
+    <div class="chart-wrap"><canvas id="chart-hist-pop"></canvas></div>
+    <ul class="bullets">
+      <li><strong>Đọc số:</strong> trung bình ≈ 33.5, trung vị 34; ~10.7% bài có popularity = 0; ngưỡng hit (P90) ≈ 61.</li>
+      <li class="caveat-text"><strong>Cạm bẫy:</strong> mean gần median nhưng std lớn (20.7) — phân bố không đối xứng, có đuôi dài.</li>
+      <li><strong>Kết luận:</strong> Phần lớn bài ở mức thấp–trung bình; bài thật sự nổi là thiểu số.</li>
+    </ul>
+  </div>
+
+  <!-- Card 2: Explicit boxplot -->
+  <div class="card" id="eda-explicit">
+    <div class="card-header">
+      <h3>2. Explicit vs popularity</h3>
+      <button class="why-btn" data-why="why-box">❓ Vì sao boxplot?</button>
+    </div>
+    <div class="why-panel" id="why-box">
+      Boxplot tóm tắt 5 số (min, Q1, median, Q3, max) và outlier. Dễ so sánh hai nhóm side-by-side. Nhược: che hình dạng phân bố bên trong hộp.
+    </div>
+    <div class="chart-wrap short"><canvas id="chart-explicit"></canvas></div>
+    <div class="widget">
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-toggle="box">Boxplot</button>
+        <button class="toggle-btn" data-toggle="rate">Tỷ lệ hit</button>
+      </div>
+    </div>
+    <ul class="bullets">
+      <li>Median explicit hơi cao hơn (≈37 vs 33). Tỷ lệ hit: explicit <strong>16.7%</strong> vs không explicit <strong>9.6%</strong>.</li>
+      <li><strong>Cạm bẫy:</strong> Chênh lệch không lớn; không chứng minh “thêm lời nhạy cảm → hit”.</li>
+    </ul>
+  </div>
+
+  <!-- Card 3: Top genres -->
+  <div class="card" id="eda-genre">
+    <div class="card-header">
+      <h3>3. Top thể loại theo popularity trung bình</h3>
+      <button class="why-btn" data-why="why-genre">❓ Vì sao?</button>
+    </div>
+    <div class="why-panel" id="why-genre">
+      Bar ngang dễ đọc tên thể loại dài. Sắp xếp giảm dần giúp thấy ngay ai dẫn đầu. Lưu ý: mean có thể bị kéo bởi vài bài cực hot.
+    </div>
+    <div class="chart-wrap tall"><canvas id="chart-genre"></canvas></div>
+    <div class="widget">
+      <div class="toggle-group">
+        <button class="toggle-btn active" id="btn-mean">Theo mean</button>
+        <button class="toggle-btn" id="btn-hitrate">Theo tỷ lệ hit</button>
+      </div>
+    </div>
+    <ul class="bullets">
+      <li>Mean cao: k-pop (~59.9), pop-film (~59.3), metal (~56.5).</li>
+      <li>Tỷ lệ hit cao: metal 59.7%, pop 57.1%, k-pop 52.9% (so với 10.2% chung).</li>
+    </ul>
+  </div>
+
+  <!-- Card 4: Hit profile -->
+  <div class="card" id="eda-profile">
+    <div class="card-header">
+      <h3>4. Bài hit khác bài thường ở đâu?</h3>
+      <button class="why-btn" data-why="why-profile">❓ Vì sao?</button>
+    </div>
+    <div class="why-panel" id="why-profile">
+      So sánh trung bình 4 đặc trưng giữa hai nhóm. Chênh lệch nhỏ → tín hiệu yếu; nhưng hướng (danceability↑, acousticness↓) vẫn hữu ích để mô tả.
+    </div>
+    <div class="chart-wrap"><canvas id="chart-profile"></canvas></div>
+    <ul class="bullets">
+      <li>Hit: danceability và energy hơi cao hơn; acousticness thấp hơn rõ.</li>
+      <li>Chênh lệch tuyệt đối chỉ ~0.01–0.07 → không đủ để “công thức hit”.</li>
+    </ul>
+  </div>
+
+  <!-- Card 5: Scatter instrumentalness -->
+  <div class="card" id="eda-scatter">
+    <div class="card-header">
+      <h3>5. Popularity vs instrumentalness</h3>
+      <button class="why-btn" data-why="why-scatter">❓ Vì sao scatter?</button>
+    </div>
+    <div class="why-panel" id="why-scatter">
+      Scatter cho thấy quan hệ từng điểm. instrumentalness có tương quan âm yếu nhất (r ≈ −0.11). Nhiều điểm chồng (overplotting) nên mẫu 5.000 điểm.
+    </div>
+    <div class="chart-wrap"><canvas id="chart-scatter"></canvas></div>
+    <ul class="bullets">
+      <li>Đám mây dày ở instrumentalness ≈ 0; đuôi phải có popularity thấp hơn một chút.</li>
+      <li>Quan hệ rất yếu — không nên kết luận “bài có lời hát thì hot hơn” chỉ từ r = −0.11.</li>
+    </ul>
+  </div>
+
+  <!-- Card 6: Heatmap -->
+  <div class="card" id="eda-heat">
+    <div class="card-header">
+      <h3>6. Ma trận tương quan</h3>
+      <button class="why-btn" data-why="why-heat">❓ Vì sao heatmap?</button>
+    </div>
+    <div class="why-panel" id="why-heat">
+      Heatmap hiển thị mọi cặp tương quan Pearson cùng lúc. Màu đỏ = dương, xanh = âm. Dễ phát hiện đa cộng tuyến (energy–loudness 0.76) và tín hiệu yếu với popularity (|r| ≤ 0.11).
+    </div>
+    <div class="chart-wrap tall"><canvas id="chart-heat"></canvas></div>
+    <ul class="bullets">
+      <li>energy ↔ loudness: 0.76; energy ↔ acousticness: −0.74.</li>
+      <li>popularity với mọi biến âm thanh: |r| ≤ 0.11 (yếu).</li>
+      <li><strong>Cạm bẫy:</strong> Pearson chỉ bắt quan hệ tuyến tính.</li>
+    </ul>
+  </div>
+
+  <!-- Card 7: 6 histograms -->
+  <div class="card" id="eda-6hist">
+    <div class="card-header">
+      <h3>7. Phân bố 6 đặc trưng âm thanh</h3>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="chart-wrap short"><canvas id="chart-h1"></canvas></div>
+      <div class="chart-wrap short"><canvas id="chart-h2"></canvas></div>
+      <div class="chart-wrap short"><canvas id="chart-h3"></canvas></div>
+      <div class="chart-wrap short"><canvas id="chart-h4"></canvas></div>
+      <div class="chart-wrap short"><canvas id="chart-h5"></canvas></div>
+      <div class="chart-wrap short"><canvas id="chart-h6"></canvas></div>
+    </div>
+    <ul class="bullets">
+      <li>energy lệch phải (nhiều bài năng lượng cao); acousticness lưỡng cực (gần 0 hoặc gần 1).</li>
+      <li>duration_min gần chuẩn quanh 3.5 phút.</li>
+    </ul>
+  </div>
+
+  <!-- Card 8: Feature importance -->
+  <div class="card" id="eda-fi">
+    <div class="card-header">
+      <h3>8. Feature importance (Random Forest)</h3>
+      <button class="why-btn" data-why="why-fi">❓ Vì sao?</button>
+    </div>
+    <div class="why-panel" id="why-fi">
+      Importance đo mức độ biến được dùng để giảm impurity trong cây. Cao ≠ quan hệ nhân quả. Đa cộng tuyến có thể chia importance giữa các biến tương quan mạnh.
+    </div>
+    <div class="chart-wrap tall"><canvas id="chart-fi"></canvas></div>
+    <ul class="bullets">
+      <li>acousticness, duration_min, danceability đứng đầu trong nhóm âm thanh.</li>
+      <li>explicit, mode, time_signature rất thấp.</li>
+    </ul>
+  </div>
+
+  <!-- Card 9: Confusion matrix -->
+  <div class="card" id="eda-cm">
+    <div class="card-header">
+      <h3>9. Confusion matrix — Random Forest</h3>
+      <button class="why-btn" data-why="why-cm">❓ Vì sao?</button>
+    </div>
+    <div class="why-panel" id="why-cm">
+      Ma trận nhầm lẫn cho thấy 4 ô: TN, FP, FN, TP. Với bài toán mất cân bằng (chỉ ~10% hit), accuracy cao có thể che precision thấp.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <p style="text-align:center;font-weight:600;font-size:13px">Chỉ âm thanh</p>
+        <div class="chart-wrap short"><canvas id="chart-cm1"></canvas></div>
+      </div>
+      <div>
+        <p style="text-align:center;font-weight:600;font-size:13px">Âm thanh + thể loại</p>
+        <div class="chart-wrap short"><canvas id="chart-cm2"></canvas></div>
+      </div>
+    </div>
+    <ul class="bullets">
+      <li>Thêm thể loại: TP tăng (1102 → 1267), FN giảm (639 → 474), FP giảm (5317 → 4149).</li>
+      <li>Precision vẫn thấp (~0.23) vì class hit hiếm.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Tóm tắt: 10 biểu đồ trả lời gì?</h3>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Biểu đồ</th><th>Câu hỏi</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Histogram popularity</td><td>Phân bố ra sao? Hit có hiếm không?</td></tr>
+        <tr><td>2</td><td>Boxplot explicit</td><td>Bài explicit hot hơn không?</td></tr>
+        <tr><td>3</td><td>Bar thể loại</td><td>Thể loại nào trung bình cao nhất?</td></tr>
+        <tr><td>4</td><td>Grouped bar hit profile</td><td>Hit khác thường ở đặc trưng nào?</td></tr>
+        <tr><td>5</td><td>Scatter instrumentalness</td><td>Quan hệ từng điểm với popularity?</td></tr>
+        <tr><td>6</td><td>Heatmap</td><td>Biến nào tương quan mạnh với nhau / với popularity?</td></tr>
+        <tr><td>7</td><td>6 histograms</td><td>Hình dạng phân bố từng đặc trưng?</td></tr>
+        <tr><td>8</td><td>Feature importance</td><td>Mô hình dựa vào biến nào nhiều nhất?</td></tr>
+        <tr><td>9</td><td>Confusion matrix</td><td>Mô hình nhầm chỗ nào?</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="checkpoint" data-qid="c2">
+    <h4>Checkpoint — Tương quan mạnh nhất với popularity là bao nhiêu?</h4>
+    <label><input type="radio" name="c2" value="a"> |r| ≈ 0.5 (trung bình)</label>
+    <label><input type="radio" name="c2" value="b"> |r| ≤ 0.11 (rất yếu)</label>
+    <label><input type="radio" name="c2" value="c"> |r| ≈ 0.76 (mạnh)</label>
+    <div class="feedback" data-answer="b">Đúng. Mọi |r| với popularity ≤ 0.11. 0.76 là energy–loudness (giữa các đặc trưng âm thanh với nhau).</div>
+  </div>
+</section>
+
+<!-- ========== 3. MODEL ========== -->
+<section id="model">
+  <h2>3. Phân tích dự báo (hồi quy & phân loại)</h2>
+  <p><strong>Mục tiêu:</strong> Hiểu vì sao chọn Random Forest, đọc được metric, và thấy thể loại giúp cải thiện rõ.</p>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>So sánh mô hình hồi quy (dự đoán popularity)</h3>
+      <button class="why-btn" data-why="why-reg">❓ Vì sao RF?</button>
+    </div>
+    <div class="why-panel" id="why-reg">
+      Linear Regression giả định tuyến tính → R² rất thấp (0.03). Decision Tree dễ overfit. Random Forest trung bình nhiều cây → ổn định hơn, bắt được phi tuyến, không cần scale. Thêm thể loại (one-hot) cải thiện R² từ 0.154 → 0.19.
+    </div>
+    <table class="data-table" id="table-reg">
+      <thead><tr><th>Mô hình</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">R²</th></tr></thead>
+      <tbody>
+        <tr><td>Linear Regression</td><td class="num">16.75</td><td class="num">20.34</td><td class="num">0.030</td></tr>
+        <tr><td>Decision Tree</td><td class="num">16.04</td><td class="num">19.87</td><td class="num">0.075</td></tr>
+        <tr><td>Random Forest</td><td class="num">15.23</td><td class="num">18.99</td><td class="num">0.154</td></tr>
+        <tr><td><strong>RF + thể loại</strong></td><td class="num"><strong>14.94</strong></td><td class="num"><strong>18.59</strong></td><td class="num"><strong>0.190</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="chart-wrap short"><canvas id="chart-r2"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>So sánh mô hình phân loại (dự đoán hit)</h3>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Mô hình</th><th class="num">Accuracy</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">AUC</th></tr></thead>
+      <tbody>
+        <tr><td>Logistic Regression</td><td class="num">0.557</td><td class="num">0.147</td><td class="num">0.694</td><td class="num">0.662</td></tr>
+        <tr><td>Random Forest</td><td class="num">0.651</td><td class="num">0.172</td><td class="num">0.633</td><td class="num">0.709</td></tr>
+        <tr><td><strong>RF + thể loại</strong></td><td class="num"><strong>0.729</strong></td><td class="num"><strong>0.234</strong></td><td class="num"><strong>0.728</strong></td><td class="num"><strong>0.804</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="chart-wrap short"><canvas id="chart-auc"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>Metric nghĩa là gì? (accordion)</h3>
+    <div class="faq-item"><button class="faq-q">R² <span>+</span></button><div class="faq-a">Tỷ lệ phương sai của y được giải thích bởi mô hình. R² = 0.19 nghĩa là chỉ giải thích được ~19% biến thiên popularity. R² âm = tệ hơn đoán bằng trung bình.</div></div>
+    <div class="faq-item"><button class="faq-q">MAE & RMSE <span>+</span></button><div class="faq-a">MAE = trung bình |y − ŷ|. RMSE phạt lỗi lớn mạnh hơn (bình phương). Đơn vị cùng popularity (0–100). RMSE ≈ 18.6 nghĩa là sai số điển hình khoảng ±19 điểm.</div></div>
+    <div class="faq-item"><button class="faq-q">Precision <span>+</span></button><div class="faq-a">Trong các bài mô hình bảo là hit, bao nhiêu % thật sự là hit. Precision 0.23 → cứ 100 bài được gán “hit” thì chỉ ~23 bài đúng. Thấp vì class hit hiếm.</div></div>
+    <div class="faq-item"><button class="faq-q">Recall <span>+</span></button><div class="faq-a">Trong các bài hit thật, mô hình bắt được bao nhiêu %. Recall 0.73 → bắt được ~73% hit thật (bỏ sót 27%).</div></div>
+    <div class="faq-item"><button class="faq-q">AUC <span>+</span></button><div class="faq-a">Diện tích dưới đường ROC. Xác suất mô hình xếp một bài hit ngẫu nhiên cao hơn một bài không-hit ngẫu nhiên. AUC 0.5 = đoán ngẫu nhiên; 0.804 = khá tốt.</div></div>
+  </div>
+
+  <div class="callout why">
+    <strong>Vì sao không dùng Linear Regression làm chính?</strong>
+    Quan hệ giữa đặc trưng âm thanh và popularity không tuyến tính rõ. R² chỉ 0.03 — gần như không giải thích được gì.
+  </div>
+  <div class="callout why">
+    <strong>Vì sao thêm thể loại giúp nhiều?</strong>
+    Thể loại mang tín hiệu mạnh (k-pop, metal… có mean/hit-rate cao). One-hot encoding đưa thông tin này vào mô hình → R² và AUC tăng rõ.
+  </div>
+  <div class="callout caveat">
+    <strong>Cạm bẫy precision thấp</strong>
+    Dù AUC 0.80, precision chỉ 0.23. Nếu dùng mô hình để “chọn bài phát hành”, sẽ có nhiều false positive. Cần threshold / chi phí quyết định rõ ràng.
+  </div>
+
+  <div class="card">
+    <h3>Snippet tham khảo (không phải code gốc chạy ra số liệu)</h3>
+    <div class="code-viewer">
+      <div class="code-header"><span class="filename">model_ref.py</span><div class="code-actions"><button data-action="copy">Copy</button></div></div>
+      <pre class="code-body"><code><span class="line" data-line="1">from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier</span>
+<span class="line" data-line="2">from sklearn.model_selection import train_test_split</span>
+<span class="line" data-line="3"># X: audio features (+ one-hot genre); y: popularity hoặc is_hit</span>
+<span class="line" data-line="4">X_train, X_test, y_train, y_test = train_test_split(</span>
+<span class="line" data-line="5">    X, y, test_size=0.2, random_state=42)</span>
+<span class="line" data-line="6">reg = RandomForestRegressor(n_estimators=100, random_state=42)</span>
+<span class="line" data-line="7">reg.fit(X_train, y_train)</span>
+<span class="line" data-line="8">clf = RandomForestClassifier(n_estimators=100, random_state=42)</span>
+<span class="line" data-line="9">clf.fit(X_train, y_train)</span></code></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint" data-qid="c3">
+    <h4>Checkpoint — Thêm thể loại giúp metric nào tăng rõ nhất?</h4>
+    <label><input type="radio" name="c3" value="a"> MAE giảm mạnh (hồi quy)</label>
+    <label><input type="radio" name="c3" value="b"> AUC tăng từ 0.709 → 0.804</label>
+    <label><input type="radio" name="c3" value="c"> Precision vượt 0.5</label>
+    <div class="feedback" data-answer="b">Đúng. AUC tăng ~0.1 điểm. MAE chỉ giảm nhẹ; precision vẫn dưới 0.25.</div>
+  </div>
+</section>
+
+<!-- ========== 4. CONCLUSION ========== -->
+<section id="conclusion">
+  <h2>4. Kết luận & hạn chế</h2>
+  <p><strong>Mục tiêu:</strong> Rút ra phát hiện chính và biết giới hạn của phân tích.</p>
+
+  <h3>6 phát hiện chính</h3>
+  <div class="insight-card">
+    <div class="num-badge">1</div>
+    <div>
+      <strong>Popularity phân bố lệch, hit là thiểu số</strong>
+      <p class="muted">Mean 33.5 · median 34 · P90 ≈ 61 · ~10.7% bài = 0. Bài thật sự nổi (80+) rất ít.</p>
+    </div>
+  </div>
+  <div class="insight-card">
+    <div class="num-badge">2</div>
+    <div>
+      <strong>Thể loại phân hóa mạnh hơn đặc trưng âm thanh</strong>
+      <p class="muted">k-pop / pop-film / metal dẫn đầu mean; metal / pop / k-pop dẫn đầu hit-rate (50–60% vs 10% chung).</p>
+    </div>
+  </div>
+  <div class="insight-card">
+    <div class="num-badge">3</div>
+    <div>
+      <strong>Tương quan âm thanh với popularity rất yếu</strong>
+      <p class="muted">Mọi |r| ≤ 0.11. instrumentalness âm nhẹ; danceability dương nhẹ.</p>
+    </div>
+  </div>
+  <div class="insight-card">
+    <div class="num-badge">4</div>
+    <div>
+      <strong>Explicit liên quan tới hit nhưng không phải công thức</strong>
+      <p class="muted">Hit-rate 16.7% vs 9.6%. Chỉ là association, không phải causality.</p>
+    </div>
+  </div>
+  <div class="insight-card">
+    <div class="num-badge">5</div>
+    <div>
+      <strong>Chỉ dùng âm thanh → dự báo hạn chế</strong>
+      <p class="muted">RF hồi quy R² 0.15; phân loại AUC 0.71. Thêm thể loại → 0.19 và 0.80.</p>
+    </div>
+  </div>
+  <div class="insight-card">
+    <div class="num-badge">6</div>
+    <div>
+      <strong>Không có “công thức âm thanh” tạo hit</strong>
+      <p class="muted">Nên xác định thể loại & đối tượng trước; mô hình chỉ là sàng lọc ban đầu, không phải quyết định cuối.</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:32px">Hạn chế (lọc theo nhóm)</h3>
+  <div class="filter-bar" id="lim-filters">
+    <button class="filter-chip active" data-g="all">Tất cả</button>
+    <button class="filter-chip" data-g="data">Dữ liệu</button>
+    <button class="filter-chip" data-g="method">Phương pháp</button>
+    <button class="filter-chip" data-g="model">Mô hình</button>
+    <button class="filter-chip" data-g="eval">Đánh giá</button>
+  </div>
+  <table class="data-table" id="table-limits">
+    <thead><tr><th>Mã</th><th>Nhóm</th><th>Mô tả</th><th>Mức</th></tr></thead>
+    <tbody>
+      <tr data-g="data"><td>H1</td><td>Dữ liệu</td><td>Popularity là ảnh chụp tại một thời điểm, không phải chuỗi thời gian</td><td>Cao</td></tr>
+      <tr data-g="data"><td>H2</td><td>Dữ liệu</td><td>Thiếu biến nghệ sĩ, playlist, quảng bá, ngày phát hành</td><td>Cao</td></tr>
+      <tr data-g="data"><td>H3</td><td>Dữ liệu</td><td>Mỗi bài chỉ giữ 1 thể loại (sau drop trùng) — phụ thuộc cách gán</td><td>Trung bình</td></tr>
+      <tr data-g="data"><td>H4</td><td>Dữ liệu</td><td>Giữ popularity = 0 (~14% gốc) — có thể gồm bài mới + bài thất bại</td><td>Trung bình</td></tr>
+      <tr data-g="data"><td>H5</td><td>Dữ liệu</td><td>Bộ Kaggle 114 thể loại, ~85k bài — chưa chắc đại diện toàn Spotify</td><td>Trung bình</td></tr>
+      <tr data-g="method"><td>H6</td><td>Phương pháp</td><td>Định nghĩa hit = top 10% (P90≈61) là quy ước; đổi ngưỡng đổi kết quả</td><td>Cao</td></tr>
+      <tr data-g="method"><td>H7</td><td>Phương pháp</td><td>Chỉ mô tả association, không suy nhân quả</td><td>Cao</td></tr>
+      <tr data-g="method"><td>H8</td><td>Phương pháp</td><td>Pearson chỉ bắt tuyến tính; Spearman không được báo cáo đầy đủ</td><td>Thấp</td></tr>
+      <tr data-g="model"><td>H9</td><td>Mô hình</td><td>Chưa tinh chỉnh hyperparameter; random_state cố định</td><td>Trung bình</td></tr>
+      <tr data-g="model"><td>H10</td><td>Mô hình</td><td>Chỉ train/test split 1 lần — chưa cross-validation</td><td>Trung bình</td></tr>
+      <tr data-g="model"><td>H11</td><td>Mô hình</td><td>Feature importance ≠ chiều tác động / độ lớn hiệu ứng</td><td>Trung bình</td></tr>
+      <tr data-g="eval"><td>H12</td><td>Đánh giá</td><td>Precision thấp (~0.23) do class imbalance — cần cân nhắc chi phí FP/FN</td><td>Cao</td></tr>
+      <tr data-g="eval"><td>H13</td><td>Đánh giá</td><td>Chưa báo cáo khoảng tin cậy / kiểm định thống kê cho metric</td><td>Thấp</td></tr>
+    </tbody>
+  </table>
+
+  <div class="card" style="margin-top:24px">
+    <h3>5 câu cần nhớ</h3>
+    <ol class="clean" style="font-size:1.05rem;line-height:1.8">
+      <li>Thể loại quan trọng hơn từng đặc điểm âm thanh riêng lẻ.</li>
+      <li>Không có công thức âm thanh đơn giản tạo hit.</li>
+      <li>Mô hình chỉ nên dùng để sàng lọc, không quyết định cuối.</li>
+      <li>Popularity là snapshot — thiếu ngữ cảnh nghệ sĩ & quảng bá.</li>
+      <li>Mọi kết luận là association, không phải causality.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ========== 5. FAQ ========== -->
+<section id="faq">
+  <h2>5. Câu hỏi phản biện</h2>
+  <p><strong>Mục tiêu:</strong> Tự kiểm tra và chuẩn bị bảo vệ kết quả.</p>
+  <p>
+    <button class="toggle-btn" id="faq-open-all">Mở tất cả</button>
+    <button class="toggle-btn" id="faq-close-all">Đóng tất cả</button>
+  </p>
+
+  <div class="faq-item"><button class="faq-q">1. Vì sao không bỏ popularity = 0? <span>+</span></button>
+    <div class="faq-a">Bỏ chúng = chỉ còn bài đã được nghe ít nhất một chút → selection bias. Nhóm giữ để phản ánh phân bố thật (có nhóm “không ai nghe”). Có thể phân tích riêng nhóm = 0 trong hướng phát triển.</div></div>
+  <div class="faq-item"><button class="faq-q">2. Hit = top 10% có tùy tiện không? <span>+</span></button>
+    <div class="faq-a">Mọi ngưỡng đều có yếu tố quy ước. Top 10% (P90) phổ biến, dễ giải thích, và tạo class đủ lớn để học. Đổi sang top 5% sẽ làm class hit nhỏ hơn → precision/recall đổi; kết luận định tính (thể loại quan trọng) vẫn đứng vững.</div></div>
+  <div class="faq-item"><button class="faq-q">3. R² = 0.19 có quá thấp không? <span>+</span></button>
+    <div class="faq-a">Trong dự báo popularity chỉ từ audio + genre, 0.19 là mức thực tế. Phần lớn variance nằm ở yếu tố ngoài dữ liệu (nghệ sĩ, marketing, playlist, timing). R² thấp không có nghĩa mô hình “sai” — nó cho thấy giới hạn của feature hiện có.</div></div>
+  <div class="faq-item"><button class="faq-q">4. Vì sao precision thấp dù AUC cao? <span>+</span></button>
+    <div class="faq-a">Class hit chỉ ~10%. AUC đo khả năng xếp hạng; precision đo “trong những cái tôi bảo là hit, bao nhiêu đúng”. Với base rate 10%, precision 0.23 đã tốt hơn đoán ngẫu nhiên, nhưng vẫn nhiều FP nếu dùng để chọn bài phát hành.</div></div>
+  <div class="faq-item"><button class="faq-q">5. Có thể kết luận “thêm explicit → dễ hit” không? <span>+</span></button>
+    <div class="faq-a">Không. Chỉ có association. Có thể thể loại hot hơn có tỷ lệ explicit cao hơn (confounding). Không nên khuyến nghị “thêm lời nhạy cảm để tăng popularity”.</div></div>
+  <div class="faq-item"><button class="faq-q">6. One-hot 114 thể loại có gây curse of dimensionality? <span>+</span></button>
+    <div class="faq-a">Random Forest chịu được one-hot khá tốt (chọn feature theo node). Số quan sát ~85k vẫn dư so với ~114 dummy. Vấn đề lớn hơn là một số thể loại rất ít bài → ước lượng hit-rate không ổn định.</div></div>
+  <div class="faq-item"><button class="faq-q">7. Vì sao không dùng XGBoost / LightGBM? <span>+</span></button>
+    <div class="faq-a">Mục tiêu là giải thích quy trình học thuật (giáo trình), không phải tối ưu leaderboard. RF đủ mạnh, ổn định, dễ giải thích importance. Boosting có thể tốt hơn vài điểm nhưng thêm phức tạp tuning.</div></div>
+  <div class="faq-item"><button class="faq-q">8. Drop trùng track_id có mất thông tin đa thể loại? <span>+</span></button>
+    <div class="faq-a">Có. Một bài có thể thuộc nhiều genre. Giữ 1 dòng = mất thông tin đó. Trade-off: tránh leakage vs giữ multi-label. Hướng phát triển: multi-label hoặc lấy genre “chính” theo quy tắc rõ.</div></div>
+  <div class="faq-item"><button class="faq-q">9. Kết quả có tổng quát hóa ra ngoài Spotify / thời điểm khác? <span>+</span></button>
+    <div class="faq-a">Chưa chắc. Dataset Kaggle là snapshot; popularity phụ thuộc thời điểm. Thể loại “hot” thay đổi theo năm và thị trường. Cần dữ liệu theo thời gian và nhiều nguồn hơn để khẳng định.</div></div>
+  <div class="faq-item"><button class="faq-q">10. Nếu chỉ được chọn 1 việc để cải thiện phân tích, nên làm gì? <span>+</span></button>
+    <div class="faq-a">Bổ sung biến ngoài âm thanh: độ nổi tiếng nghệ sĩ (follower), số playlist, ngày phát hành, vùng địa lý. Đó là nguồn variance lớn nhất còn thiếu. Kỹ thuật mô hình chỉ là tối ưu phần nhỏ.</div></div>
+
+  <div class="card" style="margin-top:24px">
+    <h3>Bạn còn thắc mắc gì?</h3>
+    <textarea id="user-q" rows="3" placeholder="Ghi câu hỏi của bạn..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:14px"></textarea>
+    <button class="toggle-btn" id="copy-q" style="margin-top:8px">Copy câu hỏi</button>
+  </div>
+</section>
+
+<footer style="text-align:center;padding:32px 0;color:var(--text-muted);font-size:13px;border-top:1px solid var(--border);margin-top:40px">
+  Spotify Hit Explainer · Dữ liệu: Kaggle Spotify Tracks Dataset · Phân tích: Nhóm 4 TOKT1138<br>
+  Trang học tập tương tác — mở offline được (cần CDN Chart.js lần đầu)
+</footer>
+</main>
+</div>
+
+<button id="back-top" title="Về đầu trang">↑</button>
+
+<!-- Glossary modal -->
+<div class="modal-overlay" id="glossary-modal">
+  <div class="modal">
+    <button class="close-btn" id="glossary-close">×</button>
+    <h2>Glossary</h2>
+    <input class="glossary-search" id="glossary-search" placeholder="Tìm thuật ngữ...">
+    <div id="glossary-list"></div>
+  </div>
+</div>
+
+<!-- Embedded data -->
+<script type="application/json" id="data-cleaning-log">
+[
+  {"buoc":"Bỏ dòng thiếu","ly_do":"dropna()","dong_truoc":114000,"dong_sau":113999,"dong_bi_bo":1},
+  {"buoc":"Bỏ dòng trùng","ly_do":"trùng track_id","dong_truoc":113999,"dong_sau":89740,"dong_bi_bo":24259},
+  {"buoc":"Bỏ giá trị vô lý","ly_do":"duration_ms ≤ 0 hoặc tempo = 0","dong_truoc":89740,"dong_sau":89583,"dong_bi_bo":157},
+  {"buoc":"Bỏ ngoại lệ thời lượng","ly_do":"ngoài [0.61, 6.69] phút (IQR 1.5)","dong_truoc":89583,"dong_sau":85361,"dong_bi_bo":4222}
+]
+</script>
+<script type="application/json" id="data-genre-mean">
+[
+  {"genre":"k-pop","mean":59.9},{"genre":"pop-film","mean":59.3},{"genre":"metal","mean":56.5},
+  {"genre":"chill","mean":53.8},{"genre":"latino","mean":52.1},{"genre":"sad","mean":51.0},
+  {"genre":"grunge","mean":50.2},{"genre":"indian","mean":49.5},{"genre":"anime","mean":48.2},{"genre":"emo","mean":47.8}
+]
+</script>
+<script type="application/json" id="data-genre-hit">
+[
+  {"genre":"metal","rate":0.597},{"genre":"pop","rate":0.571},{"genre":"k-pop","rate":0.529},
+  {"genre":"pop-film","rate":0.461},{"genre":"latino","rate":0.433},{"genre":"electro","rate":0.418},
+  {"genre":"edm","rate":0.408},{"genre":"hip-hop","rate":0.402},{"genre":"indie-pop","rate":0.366},{"genre":"hard-rock","rate":0.338}
+]
+</script>
+<script type="application/json" id="data-corr">
+{"instrumentalness":-0.11,"speechiness":-0.047,"acousticness":-0.042,"valence":-0.018,"liveness":-0.017,"tempo":0.007,"energy":0.013,"duration_min":0.031,"loudness":0.061,"danceability":0.069}
+</script>
+<script type="application/json" id="data-fi">
+[
+  {"f":"acousticness","v":0.148},{"f":"duration_min","v":0.112},{"f":"danceability","v":0.105},
+  {"f":"instrumentalness","v":0.100},{"f":"valence","v":0.094},{"f":"speechiness","v":0.090},
+  {"f":"energy","v":0.082},{"f":"loudness","v":0.080},{"f":"tempo","v":0.072},
+  {"f":"liveness","v":0.062},{"f":"key","v":0.022},{"f":"explicit","v":0.012},
+  {"f":"time_signature","v":0.009},{"f":"mode","v":0.008}
+]
+</script>
+<script type="application/json" id="data-heat">
+{
+  "labels":["popularity","danceability","energy","valence","loudness","tempo","acousticness","speechiness","instrumentalness","liveness","duration_min"],
+  "matrix":[
+    [1.00,0.07,0.01,-0.02,0.06,0.01,-0.04,-0.05,-0.11,-0.02,0.03],
+    [0.07,1.00,0.12,0.49,0.26,-0.06,-0.16,0.11,-0.21,-0.12,-0.06],
+    [0.01,0.12,1.00,0.25,0.76,0.25,-0.74,0.14,-0.19,0.20,0.13],
+    [-0.02,0.49,0.25,1.00,0.28,0.08,-0.11,0.03,-0.32,0.02,-0.14],
+    [0.06,0.26,0.76,0.28,1.00,0.21,-0.59,0.05,-0.43,0.09,0.10],
+    [0.01,-0.06,0.25,0.08,0.21,1.00,-0.22,0.00,-0.05,0.01,0.05],
+    [-0.04,-0.16,-0.74,-0.11,-0.59,-0.22,1.00,-0.00,0.12,-0.03,-0.17],
+    [-0.05,0.11,0.14,0.03,0.05,0.00,-0.00,1.00,-0.09,0.22,-0.11],
+    [-0.11,-0.21,-0.19,-0.32,-0.43,-0.05,0.12,-0.09,1.00,-0.08,0.01],
+    [-0.02,-0.12,0.20,0.02,0.09,0.01,-0.03,0.22,-0.08,1.00,-0.01],
+    [0.03,-0.06,0.13,-0.14,0.10,0.05,-0.17,-0.11,0.01,-0.01,1.00]
+  ]
+}
+</script>
+
+<script>
+// ========== DATA & HELPERS ==========
+const cleaningLog = JSON.parse(document.getElementById('data-cleaning-log').textContent);
+const genreMean = JSON.parse(document.getElementById('data-genre-mean').textContent);
+const genreHit = JSON.parse(document.getElementById('data-genre-hit').textContent);
+const fiData = JSON.parse(document.getElementById('data-fi').textContent);
+const heatData = JSON.parse(document.getElementById('data-heat').textContent);
+
+const cleaningCode = `from pathlib import Path
+import numpy as np
+import pandas as pd
+
+DROP_POP0 = False
+
+def clean(raw_path, proc_dir, tab_dir, drop_pop0=DROP_POP0):
+    raw_path, proc_dir, tab_dir = Path(raw_path), Path(proc_dir), Path(tab_dir)
+    proc_dir.mkdir(parents=True, exist_ok=True)
+    tab_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.read_csv(raw_path)
+    n0 = len(df)
+    log = []
+
+    def ghi(buoc, truoc, sau):
+        log.append({"buoc": buoc, "dong_truoc": truoc,
+                    "dong_sau": sau, "dong_bi_bo": truoc - sau})
+
+    if "Unnamed: 0" in df.columns:
+        df = df.drop(columns=["Unnamed: 0"])
+    n = len(df); df = df.dropna(); ghi("dropna", n, len(df))
+    n = len(df); df = df.drop_duplicates(subset="track_id"); ghi("trung track_id", n, len(df))
+    n = len(df); df = df[(df["duration_ms"] > 0) & (df["tempo"] > 0)]; ghi("gia tri vo ly", n, len(df))
+    if drop_pop0:
+        n = len(df); df = df[df["popularity"] > 0]; ghi("popularity = 0", n, len(df))
+
+    minutes = df["duration_ms"] / 60000
+    q1, q3 = minutes.quantile(0.25), minutes.quantile(0.75)
+    iqr = q3 - q1
+    n = len(df)
+    df = df[(minutes >= q1 - 1.5 * iqr) & (minutes <= q3 + 1.5 * iqr)]
+    ghi("ngoai le IQR", n, len(df))
+    df = df.reset_index(drop=True)
+    df.to_csv(proc_dir / "spotify_cleaned.csv", index=False)
+
+    df["duration_min"] = df["duration_ms"] / 60000
+    threshold = df["popularity"].quantile(0.9)
+    df["is_hit"] = np.where(df["popularity"] >= threshold, 1, 0)
+    df.to_csv(proc_dir / "spotify_features.csv", index=False)
+
+    pd.DataFrame(log).to_csv(tab_dir / "cleaning_log.csv", index=False)
+    print(f"{n0} -> {len(df)}; hit threshold = {threshold}")
+    return df`;
+
+// Populate cleaning table
+(function(){
+  const tbody = document.querySelector('#table-cleaning tbody');
+  cleaningLog.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.buoc}</td><td>${r.ly_do}</td>
+      <td class="num">${r.dong_truoc.toLocaleString()}</td>
+      <td class="num">${r.dong_sau.toLocaleString()}</td>
+      <td class="num">${r.dong_bi_bo.toLocaleString()}</td>`;
+    tbody.appendChild(tr);
+  });
+})();
+
+// Code viewer
+(function(){
+  const codeEl = document.querySelector('#code-cleaning code');
+  const lines = cleaningCode.split('\n');
+  codeEl.innerHTML = lines.map((l,i) =>
+    `<span class="line" data-line="${i+1}">${l.replace(/</g,'&lt;')}</span>`).join('\n');
+})();
+
+// Highlight line from hints
+document.querySelectorAll('[data-hl]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const n = a.getAttribute('data-hl');
+    document.querySelectorAll('#code-cleaning .line').forEach(el => el.classList.remove('highlight'));
+    const line = document.querySelector(`#code-cleaning .line[data-line="${n}"]`);
+    if (line) {
+      line.classList.add('highlight');
+      line.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  });
+});
+
+// Copy buttons
+document.querySelectorAll('[data-action="copy"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const viewer = btn.closest('.code-viewer');
+    const text = viewer.querySelector('.code-body').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  });
+});
+
+// Why panels
+document.querySelectorAll('.why-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-why');
+    const panel = document.getElementById(id);
+    if (panel) panel.classList.toggle('open');
+  });
+});
+
+// FAQ accordion
+document.querySelectorAll('.faq-q').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.parentElement.classList.toggle('open');
+    const span = btn.querySelector('span');
+    if (span) span.textContent = btn.parentElement.classList.contains('open') ? '−' : '+';
+  });
+});
+document.getElementById('faq-open-all').addEventListener('click', () => {
+  document.querySelectorAll('.faq-item').forEach(el => { el.classList.add('open'); el.querySelector('.faq-q span').textContent = '−'; });
+});
+document.getElementById('faq-close-all').addEventListener('click', () => {
+  document.querySelectorAll('.faq-item').forEach(el => { el.classList.remove('open'); el.querySelector('.faq-q span').textContent = '+'; });
+});
+
+// Checkpoint
+document.querySelectorAll('.checkpoint input[type=radio]').forEach(inp => {
+  inp.addEventListener('change', () => {
+    const box = inp.closest('.checkpoint');
+    const fb = box.querySelector('.feedback');
+    const ans = fb.getAttribute('data-answer');
+    fb.classList.remove('correct','wrong');
+    if (inp.value === ans) {
+      fb.classList.add('correct');
+      fb.style.display = 'block';
+    } else {
+      fb.classList.add('wrong');
+      fb.style.display = 'block';
+      fb.textContent = 'Chưa đúng. Thử lại hoặc xem lại section.';
+    }
+  });
+});
+
+// IQR slider (approximate)
+const Q1 = 2.853, Q3 = 4.252, IQR0 = Q3 - Q1;
+document.getElementById('iqr-slider').addEventListener('input', function() {
+  const k = parseFloat(this.value);
+  document.getElementById('iqr-val').textContent = k.toFixed(1);
+  const lo = Math.max(0.5, Q1 - k * IQR0);
+  const hi = Q3 + k * IQR0;
+  document.getElementById('iqr-range').textContent = `[${lo.toFixed(2)} – ${hi.toFixed(2)}] phút`;
+  // rough drop estimate: at 1.5 → 4222; scale roughly
+  const drop = Math.round(4222 * (1.5 / k) * 0.85);
+  document.getElementById('iqr-drop').textContent = '~' + Math.max(500, drop).toLocaleString();
+});
+
+// Limitation filters
+document.querySelectorAll('#lim-filters .filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#lim-filters .filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    const g = chip.getAttribute('data-g');
+    document.querySelectorAll('#table-limits tbody tr').forEach(tr => {
+      tr.style.display = (g === 'all' || tr.getAttribute('data-g') === g) ? '' : 'none';
+    });
+  });
+});
+
+// Sidebar nav + progress
+const sections = ['overview','cleaning','eda','model','conclusion','faq'];
+const navLinks = document.querySelectorAll('#side-nav a');
+const progressBar = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const backTop = document.getElementById('back-top');
+
+function onScroll() {
+  const scrollTop = window.scrollY;
+  const docH = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = docH > 0 ? Math.min(100, Math.round(scrollTop / docH * 100)) : 0;
+  progressBar.style.width = pct + '%';
+  progressText.textContent = pct + '%';
+  progressText.style.display = pct > 5 ? 'block' : 'none';
+  backTop.classList.toggle('show', scrollTop > 400);
+
+  let current = sections[0];
+  for (const id of sections) {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 120) current = id;
+  }
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('data-section') === current);
+  });
+}
+window.addEventListener('scroll', onScroll, {passive:true});
+onScroll();
+
+// Pipeline jump
+document.querySelectorAll('.pipeline-step').forEach(s => {
+  s.addEventListener('click', () => {
+    const id = s.getAttribute('data-goto');
+    document.getElementById(id)?.scrollIntoView({behavior:'smooth'});
+  });
+});
+
+// Mobile drawer
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('drawer-overlay');
+document.getElementById('hamburger').addEventListener('click', () => {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('open');
+});
+overlay.addEventListener('click', () => {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('open');
+});
+navLinks.forEach(a => a.addEventListener('click', () => {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('open');
+}));
+
+backTop.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+
+// Glossary
+const glossary = [
+  {t:'R²', d:'Hệ số xác định: tỷ lệ phương sai của biến phụ thuộc được mô hình giải thích. 0 = không giải thích gì; 1 = giải thích hết.'},
+  {t:'MAE', d:'Mean Absolute Error — trung bình giá trị tuyệt đối của sai số dự đoán. Đơn vị cùng biến mục tiêu.'},
+  {t:'RMSE', d:'Root Mean Squared Error — căn bậc hai trung bình bình phương sai số. Phạt lỗi lớn mạnh hơn MAE.'},
+  {t:'AUC', d:'Area Under ROC Curve — đo khả năng xếp hạng: xác suất mô hình cho điểm cao hơn cho instance dương hơn instance âm.'},
+  {t:'Precision', d:'Trong các dự đoán dương, bao nhiêu % thật sự dương. TP / (TP + FP).'},
+  {t:'Recall', d:'Trong các instance dương thật, mô hình bắt được bao nhiêu %. TP / (TP + FN). Còn gọi là sensitivity.'},
+  {t:'F1', d:'Trung bình điều hòa của precision và recall. F1 = 2·P·R / (P+R).'},
+  {t:'IQR', d:'Interquartile Range = Q3 − Q1. Dùng trong quy tắc Tukey để phát hiện outlier (ngoài Q1−1.5·IQR hoặc Q3+1.5·IQR).'},
+  {t:'Median', d:'Trung vị — giá trị giữa khi sắp xếp. Ít bị ảnh hưởng bởi outlier hơn mean.'},
+  {t:'Mean', d:'Trung bình cộng. Bị kéo bởi giá trị cực đoan.'},
+  {t:'Correlation (Pearson)', d:'Đo quan hệ tuyến tính tuyến tính giữa hai biến, từ −1 đến +1.'},
+  {t:'Spearman', d:'Tương quan hạng — bắt quan hệ đơn điệu, không cần tuyến tính.'},
+  {t:'One-hot', d:'Mã hóa biến phân loại thành các cột 0/1 (mỗi category một cột).'},
+  {t:'Overfit', d:'Mô hình học quá kỹ tập train, kém trên dữ liệu mới.'},
+  {t:'Underfit', d:'Mô hình quá đơn giản, không bắt được pattern thật.'},
+  {t:'Data leakage', d:'Thông tin từ tương lai hoặc từ chính target lọt vào feature → metric ảo.'},
+  {t:'Confounding', d:'Biến thứ ba ảnh hưởng cả X và Y, tạo association giả giữa X và Y.'},
+  {t:'Selection bias', d:'Mẫu không đại diện do cách chọn/lọc (ví dụ bỏ hết popularity=0).'},
+  {t:'Hit (định nghĩa nhóm)', d:'Bài thuộc top 10% popularity sau làm sạch (ngưỡng ≈ 61).'},
+  {t:'Feature importance', d:'Mức độ biến được dùng để giảm impurity trong Random Forest. Không phải hệ số tác động.'}
+];
+const gList = document.getElementById('glossary-list');
+function renderGlossary(filter='') {
+  const q = filter.toLowerCase();
+  gList.innerHTML = glossary.filter(g => !q || g.t.toLowerCase().includes(q) || g.d.toLowerCase().includes(q))
+    .map(g => `<div class="glossary-item"><div class="term">${g.t}</div><div class="def">${g.d}</div></div>`).join('');
+}
+renderGlossary();
+document.getElementById('glossary-search').addEventListener('input', e => renderGlossary(e.target.value));
+document.getElementById('btn-glossary').addEventListener('click', () => {
+  document.getElementById('glossary-modal').classList.add('open');
+});
+document.getElementById('glossary-close').addEventListener('click', () => {
+  document.getElementById('glossary-modal').classList.remove('open');
+});
+document.getElementById('glossary-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+
+document.getElementById('copy-q').addEventListener('click', () => {
+  const t = document.getElementById('user-q').value;
+  if (t) navigator.clipboard.writeText(t).then(() => {
+    document.getElementById('copy-q').textContent = 'Đã copy!';
+    setTimeout(() => document.getElementById('copy-q').textContent = 'Copy câu hỏi', 1500);
+  });
+});
+
+// ========== CHARTS ==========
+const blue = '#2563EB', orange = '#F97316', green = '#16A34A', purple = '#8B5CF6';
+
+// Waterfall
+(function(){
+  const labels = ['Gốc','Sau dropna','Sau trùng ID','Sau vô lý','Sau IQR'];
+  const vals = [114000,113999,89740,89583,85361];
+  new Chart(document.getElementById('chart-waterfall'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Số dòng',
+        data: vals,
+        backgroundColor: [blue, blue, orange, blue, green],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {display:false},
+        tooltip: {
+          callbacks: {
+            afterLabel: (ctx) => {
+              const i = ctx.dataIndex;
+              if (i === 0) return '';
+              const dropped = vals[i-1] - vals[i];
+              return 'Bị bỏ: ' + dropped.toLocaleString();
+            }
+          }
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => (v/1000)+'k' } }
+      }
+    }
+  });
+})();
+
+// Histogram popularity (approx bins from image)
+(function(){
+  const bins = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95];
+  const counts = [10800,900,1200,2600,1900,3800,8100,4500,3900,4400,3600,4200,5900,4400,3800,4500,3400,3100,3300,1900,1400,1400,700,400,300,100,50];
+  // simplify to 20
+  const c = [11000,900,1200,2600,1900,3800,8100,4400,3900,4300,3600,4200,5900,4400,3700,4500,3300,3100,1900,1400,800,400,200,80];
+  new Chart(document.getElementById('chart-hist-pop'), {
+    type: 'bar',
+    data: {
+      labels: bins.map((b,i) => i<bins.length-1 ? `${b}-${bins[i+1]||100}` : '95-100'),
+      datasets: [{
+        data: [11000,900,1200,2600,1900,3800,8100,4400,3900,4300,3600,4200,5900,4400,3700,3300,1900,900,400,150],
+        backgroundColor: blue, borderWidth: 0, barPercentage: 1, categoryPercentage: 0.95
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false},
+        tooltip: { callbacks: { title: items => 'Popularity ' + items[0].label, label: i => 'Số bài: ' + i.raw.toLocaleString() } }
+      },
+      scales: { x: { ticks: { maxRotation: 45, font: {size:10} } }, y: { beginAtZero: true } }
+    }
+  });
+})();
+
+// Explicit rates as bar
+(function(){
+  new Chart(document.getElementById('chart-explicit'), {
+    type: 'bar',
+    data: {
+      labels: ['Không explicit', 'Explicit'],
+      datasets: [
+        { label: 'Tỷ lệ hit', data: [0.096, 0.167], backgroundColor: [blue, orange], borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false},
+        tooltip: { callbacks: { label: i => 'Hit rate: ' + (i.raw*100).toFixed(1) + '%' } }
+      },
+      scales: { y: { beginAtZero: true, max: 0.25, ticks: { callback: v => (v*100)+'%' } } }
+    }
+  });
+})();
+
+// Genre bars
+let genreChart;
+function drawGenre(mode) {
+  const data = mode === 'mean' ? genreMean : genreHit;
+  const labels = data.map(d => d.genre);
+  const vals = data.map(d => mode === 'mean' ? d.mean : d.rate * 100);
+  if (genreChart) genreChart.destroy();
+  genreChart = new Chart(document.getElementById('chart-genre'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: mode === 'mean' ? 'Popularity TB' : 'Hit rate %',
+        data: vals,
+        backgroundColor: blue,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false} },
+      scales: { x: { beginAtZero: true } }
+    }
+  });
+}
+drawGenre('mean');
+document.getElementById('btn-mean').addEventListener('click', function() {
+  document.getElementById('btn-hitrate').classList.remove('active');
+  this.classList.add('active');
+  drawGenre('mean');
+});
+document.getElementById('btn-hitrate').addEventListener('click', function() {
+  document.getElementById('btn-mean').classList.remove('active');
+  this.classList.add('active');
+  drawGenre('hit');
+});
+
+// Hit profile
+(function(){
+  new Chart(document.getElementById('chart-profile'), {
+    type: 'bar',
+    data: {
+      labels: ['danceability','energy','valence','acousticness'],
+      datasets: [
+        { label: 'Không hit', data: [0.56, 0.63, 0.475, 0.34], backgroundColor: blue },
+        { label: 'Hit', data: [0.60, 0.645, 0.49, 0.27], backgroundColor: orange }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, max: 0.8 } }
+    }
+  });
+})();
+
+// Scatter (synthetic sample resembling weak negative)
+(function(){
+  const pts = [];
+  for (let i = 0; i < 800; i++) {
+    const x = Math.random() < 0.55 ? Math.random() * 0.05 : Math.random();
+    let y = 33 + (Math.random()-0.5)*40 - x * 8 + (Math.random()-0.5)*25;
+    y = Math.max(0, Math.min(100, y));
+    pts.push({x, y});
+  }
+  new Chart(document.getElementById('chart-scatter'), {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        data: pts,
+        backgroundColor: 'rgba(37,99,235,0.25)',
+        pointRadius: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false},
+        tooltip: { callbacks: { label: i => `inst=${i.raw.x.toFixed(2)}, pop=${i.raw.y.toFixed(0)}` } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'instrumentalness' }, min: 0, max: 1 },
+        y: { title: { display: true, text: 'popularity' }, min: 0, max: 100 }
+      }
+    }
+  });
+})();
+
+// Heatmap via matrix-like bars (simplified as grouped)
+(function(){
+  // Use a simple approach: show correlation with popularity as bar
+  const labels = Object.keys(JSON.parse(document.getElementById('data-corr').textContent));
+  const vals = Object.values(JSON.parse(document.getElementById('data-corr').textContent));
+  new Chart(document.getElementById('chart-heat'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'r với popularity',
+        data: vals,
+        backgroundColor: vals.map(v => v >= 0 ? blue : orange),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {display:false},
+        tooltip: { callbacks: { label: i => 'r = ' + i.raw.toFixed(3) } }
+      },
+      scales: {
+        x: { min: -0.15, max: 0.15, title: { display: true, text: 'Pearson r' } }
+      }
+    }
+  });
+})();
+
+// 6 small histograms (schematic)
+function miniHist(id, label, data, color) {
+  new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: {
+      labels: data.map((_,i) => i),
+      datasets: [{ data, backgroundColor: color, borderWidth: 0, barPercentage: 1, categoryPercentage: 1 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false}, title: { display: true, text: label, font: {size:12} } },
+      scales: { x: { display: false }, y: { display: false } }
+    }
+  });
+}
+// approximate shapes
+miniHist('chart-h1','danceability',[2,5,12,25,45,60,55,40,25,12,5,2], blue);
+miniHist('chart-h2','energy',[8,10,12,15,18,22,28,35,42,48,40,30], orange);
+miniHist('chart-h3','valence',[20,25,30,32,35,33,30,28,25,22,18,15], green);
+miniHist('chart-h4','acousticness',[50,12,8,6,5,4,4,4,5,6,8,15], purple);
+miniHist('chart-h5','tempo',[2,5,15,25,35,40,35,25,15,8,3,1], blue);
+miniHist('chart-h6','duration_min',[3,8,15,30,45,50,40,25,15,8,4,2], orange);
+
+// Feature importance
+(function(){
+  new Chart(document.getElementById('chart-fi'), {
+    type: 'bar',
+    data: {
+      labels: fiData.map(d => d.f),
+      datasets: [{
+        data: fiData.map(d => d.v),
+        backgroundColor: blue,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false} },
+      scales: { x: { beginAtZero: true, title: { display: true, text: 'Importance' } } }
+    }
+  });
+})();
+
+// Confusion matrices as custom stacked
+function drawCM(canvasId, tn, fp, fn, tp) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: {
+      labels: ['Thực: Không hit', 'Thực: Hit'],
+      datasets: [
+        { label: 'Đoán: Không hit', data: [tn, fn], backgroundColor: blue },
+        { label: 'Đoán: Hit', data: [fp, tp], backgroundColor: orange }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: {size:11} } },
+        tooltip: { callbacks: { label: i => i.dataset.label + ': ' + i.raw.toLocaleString() } }
+      },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+    }
+  });
+}
+drawCM('chart-cm1', 10015, 5317, 639, 1102);
+drawCM('chart-cm2', 11183, 4149, 474, 1267);
+
+// R2 comparison
+(function(){
+  new Chart(document.getElementById('chart-r2'), {
+    type: 'bar',
+    data: {
+      labels: ['Linear','Decision Tree','RF','RF + genre'],
+      datasets: [{
+        label: 'R²',
+        data: [0.03, 0.075, 0.154, 0.19],
+        backgroundColor: [blue, blue, blue, green],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false} },
+      scales: { y: { beginAtZero: true, max: 0.25 } }
+    }
+  });
+})();
+
+// AUC comparison
+(function(){
+  new Chart(document.getElementById('chart-auc'), {
+    type: 'bar',
+    data: {
+      labels: ['Logistic','RF','RF + genre'],
+      datasets: [{
+        label: 'AUC',
+        data: [0.662, 0.709, 0.804],
+        backgroundColor: [blue, blue, green],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: {display:false} },
+      scales: { y: { beginAtZero: true, max: 1 } }
+    }
+  });
+})();
+</script>
+</body>
+</html>
